@@ -23,30 +23,6 @@ class FeatureExtractor(nn.Module):
     def get_input_size(self) -> int:
         return self.input_size
 
-
-class VGG16Extractor(FeatureExtractor):
-    def __init__(self, device: torch.device):
-        super().__init__('vgg16', device)
-        
-        self.model = models.vgg16(weights=models.VGG16_Weights.IMAGENET1K_V1)
-        
-        self.features = self.model.features
-        self.avgpool = self.model.avgpool
-        self.classifier = nn.Sequential(*list(self.model.classifier.children())[:-1])
-        
-        self.model = nn.Sequential(self.features, self.avgpool, nn.Flatten(), self.classifier)
-        self.model.to(device)
-        self.model.eval()
-        
-        self.feature_dim = 4096
-        self.input_size = 224
-        
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        with torch.no_grad():
-            features = self.model(x)
-        return features
-
-
 class ResNet50Extractor(FeatureExtractor):
     def __init__(self, device: torch.device):
         super().__init__('resnet50', device)
@@ -123,9 +99,7 @@ class DinoV2Extractor(FeatureExtractor):
 def create_feature_extractor(model_name: str, device: torch.device) -> FeatureExtractor:
     model_name_lower = model_name.lower()
     
-    if model_name_lower == 'vgg16':
-        extractor = VGG16Extractor(device)
-    elif model_name_lower == 'resnet50':
+    if model_name_lower == 'resnet50':
         extractor = ResNet50Extractor(device)
     elif model_name_lower == 'densenet121':
         extractor = DenseNet121Extractor(device)
@@ -145,7 +119,6 @@ def create_feature_extractor(model_name: str, device: torch.device) -> FeatureEx
 
 def get_model_info(model_name: str) -> Tuple[int, int]:
     model_configs = {
-        'vgg16': (4096, 224),
         'resnet50': (2048, 224),
         'densenet121': (1024, 224),
         'dinov2': (768, 518),
@@ -160,3 +133,4 @@ def get_model_info(model_name: str) -> Tuple[int, int]:
         raise ValueError(f"Unknown model: {model_name}")
     
     return model_configs[model_name_lower]
+

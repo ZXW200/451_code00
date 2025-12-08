@@ -4,11 +4,12 @@ import traceback
 from utils import create_output_dir
 from preprocessing import run_preprocessing_task
 from cluster import run_clustering_task
-
+import os
 
 
 # CSV file path - update this to point to your data file
-DATA_PATH = "ClimateDataBasel.csv"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DATA_PATH = os.path.join(BASE_DIR, "ClimateDataBasel.csv")
 
 
 def main():
@@ -41,3 +42,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+

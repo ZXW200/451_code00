@@ -119,9 +119,7 @@ def main():
             else:
                 continue
 
-            # --- 关键修改：用于在同数据集的不同模型间共享最佳 K ---
-            dataset_optimal_k = None
-            # --------------------------------------------------
+
 
             for model_idx, model_name in enumerate(current_models, 1):
                 print(f"\n--- 模型 [{model_name}] ({model_idx}/{len(current_models)}) 处理 {dataset_name} ---")
@@ -148,13 +146,12 @@ def main():
                 )
 
                 if dim_results.get('reduced_features') is not None:
-                    # --- 关键修改：传入 dataset_optimal_k ---
-                    clustering_result = run_clustering_pipeline(
-                        dim_results['reduced_features'],
-                        labels,
-                        class_names,
-                        model_temp_dir,
-                        fixed_k=dataset_optimal_k  # 如果不是None，则直接使用
+                     clustering_result = run_clustering_pipeline(
+                         dim_results['reduced_features'],
+                         labels,
+                         class_names,
+                         model_temp_dir,
+                         fixed_k=None 
                     )
 
                     # 如果是第一次运行（dataset_optimal_k 为 None），保存结果供后续使用
@@ -193,4 +190,5 @@ def main():
 
 if __name__ == '__main__':
     main()
+
 

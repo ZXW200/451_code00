@@ -244,7 +244,7 @@ def analyze_cluster_characteristics(df: pd.DataFrame, labels: np.ndarray,
 
 def run_clustering_task(preprocess_output: str, output_dir: Path) -> None:
     import pandas as pd
-    from .utils import save_results, save_dataframe
+    from utils import save_results, save_dataframe
     
     print("[1/4] Loading data")
     preprocess_dir = Path(preprocess_output)
@@ -313,3 +313,4 @@ def run_clustering_task(preprocess_output: str, output_dir: Path) -> None:
     save_results(cluster_analysis_results, output_dir, 'cluster_analysis.json')
     
     print(f"\nComplete. Output: {output_dir}")
+

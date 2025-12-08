@@ -51,16 +51,57 @@ class DownloadProgressBar(tqdm):
         self.update(b * bsize - self.n)
 
 
+def link_dataset_to_local(source_path: str, dataset_name: str) -> str:
+    """Create symlink or copy dataset to task2/Dataset directory"""
+    local_dataset_dir = Path(__file__).parent / 'Dataset'
+    local_dataset_dir.mkdir(exist_ok=True)
+
+    local_path = local_dataset_dir / dataset_name
+
+    # If already exists and is valid, use it
+    if local_path.exists():
+        if local_path.is_symlink() or local_path.is_dir():
+            print(f"Using existing dataset at: {local_path}")
+            return str(local_path)
+
+    # Try to create symlink first (more efficient)
+    try:
+        if local_path.exists():
+            local_path.unlink()
+        local_path.symlink_to(Path(source_path), target_is_directory=True)
+        print(f"Linked dataset to: {local_path}")
+        return str(local_path)
+    except (OSError, NotImplementedError):
+        # Symlink failed (maybe Windows without admin), copy instead
+        print(f"Symlink not available, copying to: {local_path}")
+        if local_path.exists():
+            shutil.rmtree(local_path)
+        shutil.copytree(source_path, local_path)
+        print(f"Dataset copied to: {local_path}")
+        return str(local_path)
+
+
 def prepare_cats_dogs() -> str:
     handle = DATASET_INFO['cats_dogs']['kaggle_handle']
     print(f"\n[Cats vs Dogs] Downloading from kagglehub: {handle} ...")
     try:
         path = kagglehub.dataset_download(handle)
+        print(f"Dataset downloaded to cache: {path}")
+
+        # Find the correct subfolder with cat/dog directories
+        source_path = None
         for root, dirs, files in os.walk(path):
             lower_dirs = [d.lower() for d in dirs]
             if 'cat' in lower_dirs and 'dog' in lower_dirs:
-                return str(Path(root))
-        return str(path)
+                source_path = str(Path(root))
+                break
+
+        if not source_path:
+            source_path = str(path)
+
+        # Link or copy to local Dataset directory
+        return link_dataset_to_local(source_path, 'cats_dogs')
+
     except Exception as e:
         print(f"Failed to download Cats vs Dogs dataset: {e}")
         raise e
@@ -71,13 +112,27 @@ def prepare_food101() -> str:
     print(f"\n[Food-101] Downloading from kagglehub: {handle} ...")
     try:
         path = kagglehub.dataset_download(handle)
+        print(f"Dataset downloaded to cache: {path}")
+
+        # Find the correct subfolder with images
+        source_path = None
         for root, dirs, files in os.walk(path):
             if 'images' in dirs:
-                return str(Path(root) / 'images')
-        for root, dirs, files in os.walk(path):
-            if 'apple_pie' in dirs:
-                return str(root)
-        return str(path)
+                source_path = str(Path(root) / 'images')
+                break
+
+        if not source_path:
+            for root, dirs, files in os.walk(path):
+                if 'apple_pie' in dirs:
+                    source_path = str(root)
+                    break
+
+        if not source_path:
+            source_path = str(path)
+
+        # Link or copy to local Dataset directory
+        return link_dataset_to_local(source_path, 'food101')
+
     except Exception as e:
         print(f"Failed to download Food-101 dataset: {e}")
         raise e

@@ -52,7 +52,7 @@ class DownloadProgressBar(tqdm):
 
 
 def link_dataset_to_local(source_path: str, dataset_name: str) -> str:
-    """Create symlink or copy dataset to task2/Dataset directory"""
+    """Create symlink or use cache directly to avoid duplicate data"""
     local_dataset_dir = Path(__file__).parent / 'Dataset'
     local_dataset_dir.mkdir(exist_ok=True)
 
@@ -72,13 +72,10 @@ def link_dataset_to_local(source_path: str, dataset_name: str) -> str:
         print(f"Linked dataset to: {local_path}")
         return str(local_path)
     except (OSError, NotImplementedError):
-        # Symlink failed (maybe Windows without admin), copy instead
-        print(f"Symlink not available, copying to: {local_path}")
-        if local_path.exists():
-            shutil.rmtree(local_path)
-        shutil.copytree(source_path, local_path)
-        print(f"Dataset copied to: {local_path}")
-        return str(local_path)
+        # Symlink not available - use cache directory directly to save space
+        print(f"Symlink not available, using cache directly: {source_path}")
+        print(f"(Skipping copy to save disk space)")
+        return str(source_path)
 
 
 def prepare_cats_dogs() -> str:

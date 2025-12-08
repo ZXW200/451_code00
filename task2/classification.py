@@ -7,7 +7,6 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader, TensorDataset
 from sklearn.neighbors import KNeighborsClassifier
-from sklearn.svm import SVC
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, precision_recall_fscore_support, confusion_matrix
 import matplotlib.pyplot as plt
@@ -161,30 +160,6 @@ def train_knn_classifier(
     
     return knn, training_time
 
-
-def train_svm_classifier(
-    features: np.ndarray,
-    labels: np.ndarray,
-    test_size: float = 0.2,
-    kernel: str = 'rbf'
-) -> Tuple[SVC, float]:
-    print(f"Training SVM ({kernel} kernel)")
-    
-    start_time = time.time()
-    
-    X_train, X_test, y_train, y_test = train_test_split(
-        features, labels, test_size=test_size, random_state=42, stratify=labels
-    )
-    
-    svm = SVC(kernel=kernel, random_state=42, probability=True)
-    svm.fit(X_train, y_train)
-    
-    training_time = time.time() - start_time
-    print(f"SVM training completed in {format_time(training_time)}")
-    
-    return svm, training_time
-
-
 def evaluate_classifier(
     model,
     features: np.ndarray,
@@ -304,18 +279,6 @@ def run_classification_pipeline(
             'training_time': knn_train_time
         }
     
-    if 'svm' in methods:
-        print("\n3. SVM Classifier")
-        svm_model, svm_train_time = train_svm_classifier(X_train, y_train)
-        
-        svm_metrics = evaluate_classifier(
-            svm_model, X_test, y_test, class_names, 'sklearn'
-        )
-        
-        results['svm'] = {
-            'metrics': svm_metrics,
-            'training_time': svm_train_time
-        }
     
     print("\n4. Comparison")
     
@@ -352,3 +315,4 @@ def run_classification_pipeline(
     save_json(results, output_dir / 'results', 'classification_metrics.json')
     
     return results
+

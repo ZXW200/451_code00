@@ -7,8 +7,8 @@ from cluster import run_clustering_task
 
 
 
-# Set CSV file path 
-DATA_PATH = "ClimateDataBasel.csv"  # 修改为你的 CSV 文件路径
+# CSV file path - update this to point to your data file
+DATA_PATH = "ClimateDataBasel.csv"
 
 
 def main():

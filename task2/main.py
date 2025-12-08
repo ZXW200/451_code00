@@ -10,7 +10,7 @@ from tqdm import tqdm
 try:
     import kagglehub
 except ImportError:
-    print("请先安装 kagglehub: pip install kagglehub")
+    print("Please install kagglehub first: pip install kagglehub")
     sys.exit(1)
 
 from utils import create_output_dir, get_device, print_device_info, calculate_batch_size
@@ -20,7 +20,7 @@ from cluster import run_clustering_pipeline
 from classification import run_classification_pipeline
 
 # ==========================================
-# 核心配置区域
+# Config section - datasets and models
 # ==========================================
 
 TARGET_DATASETS = ['cats_dogs', 'food101']
@@ -53,7 +53,7 @@ class DownloadProgressBar(tqdm):
 
 def prepare_cats_dogs() -> str:
     handle = DATASET_INFO['cats_dogs']['kaggle_handle']
-    print(f"\n[Cats vs Dogs] 正在通过 kagglehub 获取 {handle} ...")
+    print(f"\n[Cats vs Dogs] Downloading from kagglehub: {handle} ...")
     try:
         path = kagglehub.dataset_download(handle)
         for root, dirs, files in os.walk(path):
@@ -62,13 +62,13 @@ def prepare_cats_dogs() -> str:
                 return str(Path(root))
         return str(path)
     except Exception as e:
-        print(f"Cats vs Dogs 下载失败: {e}")
+        print(f"Failed to download Cats vs Dogs dataset: {e}")
         raise e
 
 
 def prepare_food101() -> str:
     handle = DATASET_INFO['food101']['kaggle_handle']
-    print(f"\n[Food-101] 正在通过 kagglehub 获取 {handle} ...")
+    print(f"\n[Food-101] Downloading from kagglehub: {handle} ...")
     try:
         path = kagglehub.dataset_download(handle)
         for root, dirs, files in os.walk(path):
@@ -79,7 +79,7 @@ def prepare_food101() -> str:
                 return str(root)
         return str(path)
     except Exception as e:
-        print(f"Food-101 下载失败: {e}")
+        print(f"Failed to download Food-101 dataset: {e}")
         raise e
 
 
@@ -94,15 +94,15 @@ def main():
         device = get_device(args.device)
         batch_size = calculate_batch_size(device)
 
-        print(f"输出目录: {output_dir}")
-        print(f"计算设备: {device}")
+        print(f"Output directory: {output_dir}")
+        print(f"Compute device: {device}")
 
         for subdir in ['figures', 'results']:
             (output_dir / subdir).mkdir(parents=True, exist_ok=True)
 
         for dataset_name in TARGET_DATASETS:
             print(f"\n{'=' * 60}")
-            print(f"准备处理数据集: {dataset_name}")
+            print(f"Processing dataset: {dataset_name}")
             print(f"{'=' * 60}")
 
             if args.models:
@@ -110,7 +110,7 @@ def main():
             else:
                 current_models = DATASET_MODELS_CONFIG.get(dataset_name, [])
 
-            print(f"计划运行模型: {current_models}")
+            print(f"Models to run: {current_models}")
 
             if dataset_name == 'cats_dogs':
                 dataset_path_str = prepare_cats_dogs()
@@ -122,7 +122,7 @@ def main():
 
 
             for model_idx, model_name in enumerate(current_models, 1):
-                print(f"\n--- 模型 [{model_name}] ({model_idx}/{len(current_models)}) 处理 {dataset_name} ---")
+                print(f"\n--- Model [{model_name}] ({model_idx}/{len(current_models)}) on {dataset_name} ---")
 
                 # Step 1: Feature Extraction
                 features, labels, metadata = run_feature_extraction(
@@ -151,7 +151,7 @@ def main():
                          labels,
                          class_names,
                          model_temp_dir,
-                         fixed_k=None 
+                         fixed_k=None
                     )
 
 
@@ -160,7 +160,7 @@ def main():
                     features, labels, class_names, device, model_temp_dir, methods=['linear', 'knn']
                 )
 
-                # 归档
+                # Move results to final output location
                 final_res_dir = output_dir / 'results' / dataset_name / model_name
                 final_fig_dir = output_dir / 'figures' / dataset_name / model_name
                 final_res_dir.mkdir(parents=True, exist_ok=True)
@@ -175,7 +175,7 @@ def main():
             shutil.rmtree(output_dir / '_temp')
 
         print(f"\n{'=' * 80}")
-        print(f"所有任务完成！结果位于: {output_dir}")
+        print(f"All tasks completed! Results saved to: {output_dir}")
 
     except Exception as e:
         print(f"\nERROR: {str(e)}")

@@ -28,8 +28,8 @@ class ImageDataset(Dataset):
         class_dirs = sorted([d for d in self.root_dir.iterdir() if d.is_dir()])
 
         if not class_dirs:
-            # 兼容性处理：如果找不到子文件夹，尝试递归查找（针对某些数据集结构）
-            # 或者直接报错
+            # No class folders found - could try recursive search for certain datasets
+            # but for now just raise an error
             raise ValueError(f"No subdirectories found in {self.root_dir}")
 
         self.class_names = [d.name for d in class_dirs]
@@ -57,8 +57,8 @@ class ImageDataset(Dataset):
             return image, label
         except Exception as e:
             print(f"Error loading image {img_path}: {e}")
-            # 返回一个全黑图像防止崩溃，或者重新抛出
-            # 这里简单返回一个全零张量（假设transform最后一步是ToTensor）
+            # Return blank image to prevent crashes
+            # assuming transforms end with ToTensor
             return torch.zeros((3, 224, 224)), label
 
     def get_class_names(self) -> List[str]:
@@ -128,7 +128,7 @@ def create_dataloaders(
     train_transform = get_transforms(input_size, augment=True)
     train_dataset.dataset.transform = train_transform
 
-    # 修复：pin_memory改为False以避免Windows CUDA错误
+    # pin_memory=False to avoid CUDA issues on Windows
     train_loader = DataLoader(
         train_dataset,
         batch_size=batch_size,
@@ -153,9 +153,8 @@ def create_dataloaders(
         pin_memory=False
     )
 
-    # 恢复验证集和测试集的transform
-    # 注意：random_split共享底层dataset，修改transform可能会相互影响
-    # 这里为了简单起见不做深拷贝，但在复杂场景下可能需要 CopyDataset 包装器
+    # Note: random_split shares the underlying dataset, so transform changes affect all splits
+    # Keeping it simple here but might need CopyDataset wrapper in complex scenarios
 
     dataset_info = {
         'num_classes': full_dataset.get_num_classes(),
@@ -184,7 +183,7 @@ def create_single_dataloader(
 
     print(f"Samples: {len(dataset)}, Classes: {dataset.get_num_classes()}")
 
-    # 修复：pin_memory改为False以避免Windows CUDA错误
+    # pin_memory=False to avoid CUDA issues on Windows
     dataloader = DataLoader(
         dataset,
         batch_size=batch_size,
@@ -212,7 +211,7 @@ def visualize_samples(
 ):
     import matplotlib.pyplot as plt
 
-    # 获取一批数据
+    # Grab a batch
     try:
         images, labels = next(iter(dataloader))
     except Exception as e:
@@ -233,7 +232,7 @@ def visualize_samples(
 
     fig, axes = plt.subplots(n_rows, n_cols, figsize=(n_cols * 3, n_rows * 3))
 
-    # 确保 axes 是可迭代的
+    # Make sure axes is iterable
     if num_samples == 1:
         axes = np.array([axes])
     axes = axes.flatten()
@@ -251,7 +250,7 @@ def visualize_samples(
             axes[idx].set_title(f'Class {label}')
         axes[idx].axis('off')
 
-    # 隐藏多余的子图
+    # Hide extra subplots
     for idx in range(len(images), len(axes)):
         axes[idx].axis('off')
 

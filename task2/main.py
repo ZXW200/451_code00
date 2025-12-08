@@ -56,10 +56,14 @@ def prepare_cats_dogs() -> str:
     print(f"\n[Cats vs Dogs] Downloading from kagglehub: {handle} ...")
     try:
         path = kagglehub.dataset_download(handle)
+        print(f"Dataset cached at: {path}")  # Show where data is stored
         for root, dirs, files in os.walk(path):
             lower_dirs = [d.lower() for d in dirs]
             if 'cat' in lower_dirs and 'dog' in lower_dirs:
-                return str(Path(root))
+                final_path = str(Path(root))
+                print(f"Using data from: {final_path}")
+                return final_path
+        print(f"Using data from: {path}")
         return str(path)
     except Exception as e:
         print(f"Failed to download Cats vs Dogs dataset: {e}")
@@ -71,12 +75,18 @@ def prepare_food101() -> str:
     print(f"\n[Food-101] Downloading from kagglehub: {handle} ...")
     try:
         path = kagglehub.dataset_download(handle)
+        print(f"Dataset cached at: {path}")  # Show where data is stored
         for root, dirs, files in os.walk(path):
             if 'images' in dirs:
-                return str(Path(root) / 'images')
+                final_path = str(Path(root) / 'images')
+                print(f"Using data from: {final_path}")
+                return final_path
         for root, dirs, files in os.walk(path):
             if 'apple_pie' in dirs:
-                return str(root)
+                final_path = str(root)
+                print(f"Using data from: {final_path}")
+                return final_path
+        print(f"Using data from: {path}")
         return str(path)
     except Exception as e:
         print(f"Failed to download Food-101 dataset: {e}")

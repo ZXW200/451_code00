@@ -235,7 +235,7 @@ def normalize_features(df: pd.DataFrame, method: str = 'standard') -> Tuple[pd.D
 
 
 def run_preprocessing_task(data_path: str, output_dir: Path) -> None:
-    from .utils import load_climate_data, save_dataframe
+    from utils import load_climate_data, save_dataframe
     
     print("[1/5] Loading")
     df = load_climate_data(data_path)
@@ -265,7 +265,7 @@ def run_preprocessing_task(data_path: str, output_dir: Path) -> None:
     summary['outlier_stats'] = outlier_stats.to_dict('records')
     summary['correlation_matrix'] = corr_matrix.to_dict()
     
-    from .utils import save_results
+    from utils import save_results
     save_results(summary, output_dir, 'preprocessing_summary.json')
     
     print(f"\nComplete. Output: {output_dir}")
@@ -285,3 +285,4 @@ def run_preprocessing_pipeline(df: pd.DataFrame, output_dir: Path) -> Tuple[pd.D
     summary['correlation_matrix'] = correlation_matrix.to_dict()
     
     return df_normalized, summary
+

@@ -26,7 +26,7 @@ from classification import run_classification_pipeline
 TARGET_DATASETS = ['cats_dogs', 'food101']
 
 DATASET_MODELS_CONFIG = {
-    'cats_dogs': ['dinov2'],
+    'cats_dogs': ['resnet50', 'densenet121', 'dinov2'],
     'food101': ['resnet50', 'densenet121', 'dinov2']
 }
 
@@ -193,3 +193,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+

@@ -89,7 +89,7 @@ def evaluate_clustering(
 ) -> Dict[str, float]:
     n_clusters = len(np.unique(cluster_labels))
 
-    # 针对大数据集的优化：采样计算指标
+    # For large datasets, compute metrics on a sample to save time
     if len(features) > 20000:
         print("Warning: Dataset too large, computing metrics on sample...")
         indices = np.random.choice(len(features), 20000, replace=False)
@@ -150,7 +150,7 @@ def run_clustering_pipeline(
         labels_true: Optional[np.ndarray],
         class_names: List[str],
         output_dir: Path,
-        fixed_k: Optional[int] = None  # 新增参数：如果传入则直接使用，不搜索
+        fixed_k: Optional[int] = None  # if provided, use this k directly without searching
 ) -> Dict[str, Any]:
     results = {}
 

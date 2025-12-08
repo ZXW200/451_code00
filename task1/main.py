@@ -1,4 +1,4 @@
-import argparse
+# main.py
 import sys
 import traceback
 from utils import create_output_dir
@@ -6,25 +6,16 @@ from preprocessing import run_preprocessing_task
 from cluster import run_clustering_task
 
 
+
+# Set CSV file path 
+DATA_PATH = "ClimateDataBasel.csv"  # 修改为你的 CSV 文件路径
+
+
 def main():
-    parser = argparse.ArgumentParser(
-        description='Basel Climate Data Analysis',
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-    )
-    
-    parser.add_argument(
-        '--data',
-        type=str,
-        required=True,
-        help='Path to climate data CSV file'
-    )
-    
-    args = parser.parse_args()
-    
     try:
         output_dir = create_output_dir('pipeline', 'history')
         
-        print(f"Data: {args.data}")
+        print(f"Data: {DATA_PATH}")
         print(f"Output: {output_dir}\n")
         
         preprocess_dir = output_dir / 'preprocess'
@@ -35,7 +26,7 @@ def main():
             (subdir / 'figures').mkdir(exist_ok=True)
         
         print("Preprocessing")
-        run_preprocessing_task(args.data, preprocess_dir)
+        run_preprocessing_task(DATA_PATH, preprocess_dir)
         
         print("\nClustering")
         run_clustering_task(str(preprocess_dir), cluster_dir)

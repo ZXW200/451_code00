@@ -134,7 +134,7 @@ def create_dataloaders(
         batch_size=batch_size,
         shuffle=True,
         num_workers=num_workers,
-        pin_memory=False
+        pin_memory=True
     )
 
     val_loader = DataLoader(
@@ -142,7 +142,7 @@ def create_dataloaders(
         batch_size=batch_size,
         shuffle=False,
         num_workers=num_workers,
-        pin_memory=False
+        pin_memory=True
     )
 
     test_loader = DataLoader(
@@ -150,7 +150,7 @@ def create_dataloaders(
         batch_size=batch_size,
         shuffle=False,
         num_workers=num_workers,
-        pin_memory=False
+        pin_memory=True
     )
 
     # Note: random_split shares the underlying dataset, so transform changes affect all splits
@@ -257,3 +257,4 @@ def visualize_samples(
     plt.tight_layout()
     plt.savefig(output_path, dpi=150, bbox_inches='tight')
     plt.close()
+

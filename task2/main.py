@@ -154,11 +154,6 @@ def main():
                          fixed_k=None 
                     )
 
-                    # 如果是第一次运行（dataset_optimal_k 为 None），保存结果供后续使用
-                    if dataset_optimal_k is None:
-                        dataset_optimal_k = clustering_result['kmeans']['optimal_k']
-                        print(f">>> 已锁定本数据集的最佳 K 值: {dataset_optimal_k}，后续模型将复用此值。")
-                    # -------------------------------------
 
                 # Step 3: Classification
                 run_classification_pipeline(
@@ -190,5 +185,6 @@ def main():
 
 if __name__ == '__main__':
     main()
+
 
 

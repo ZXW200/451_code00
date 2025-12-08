@@ -10,7 +10,7 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, precision_recall_fscore_support, confusion_matrix
 import matplotlib.pyplot as plt
-import seaborn as sns
+
 
 from utils import format_time, save_json
 
@@ -315,4 +315,5 @@ def run_classification_pipeline(
     save_json(results, output_dir / 'results', 'classification_metrics.json')
     
     return results
+
 

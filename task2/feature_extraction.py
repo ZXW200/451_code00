@@ -1,10 +1,8 @@
-# Feature extraction from images using pretrained deep learning models
 from pathlib import Path
 import time
 import numpy as np
 import torch
 from torch.utils.data import DataLoader
-
 from models import get_ext
 from preprocessing import make_loader, plot_samples
 from utils import save_js, fmt_time
@@ -92,3 +90,4 @@ def run_ext(data_path, ds_name, m_name, dev, bs, out_dir):
     save_js(meta, out_dir / 'results', 'ext_meta.json')
 
     return feats, lbls, meta
+

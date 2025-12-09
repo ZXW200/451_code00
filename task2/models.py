@@ -1,136 +1,106 @@
-from typing import Tuple
 import torch
 import torch.nn as nn
 from torchvision import models
 import timm
 
 
-class FeatureExtractor(nn.Module):
-    def __init__(self, model_name: str, device: torch.device):
+class BaseExt(nn.Module):
+    def __init__(self, name, dev):
         super().__init__()
-        self.model_name = model_name
-        self.device = device
-        self.model = None
-        self.feature_dim = None
-        self.input_size = None
-        
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        self.name = name
+        self.dev = dev
+        self.net = None
+        self.dim = None
+        self.size = None
+
+    def forward(self, x):
         raise NotImplementedError
-        
-    def get_feature_dim(self) -> int:
-        return self.feature_dim
-    
-    def get_input_size(self) -> int:
-        return self.input_size
 
-class ResNet50Extractor(FeatureExtractor):
-    def __init__(self, device: torch.device):
-        super().__init__('resnet50', device)
-        
-        self.model = models.resnet50(weights=models.ResNet50_Weights.IMAGENET1K_V2)
-        self.model = nn.Sequential(*list(self.model.children())[:-1])
-        self.model.to(device)
-        self.model.eval()
-        
-        self.feature_dim = 2048
-        self.input_size = 224
-        
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def get_dim(self):
+        return self.dim
+
+    def get_size(self):
+        return self.size
+
+
+class ResNetExt(BaseExt):
+    def __init__(self, dev):
+        super().__init__('resnet50', dev)
+
+        self.net = models.resnet50(weights=models.ResNet50_Weights.IMAGENET1K_V2)
+        self.net = nn.Sequential(*list(self.net.children())[:-1])
+        self.net.to(dev)
+        self.net.eval()
+
+        self.dim = 2048
+        self.size = 224
+
+    def forward(self, x):
         with torch.no_grad():
-            features = self.model(x)
-            features = features.flatten(1)
-        return features
+            f = self.net(x)
+            f = f.flatten(1)
+        return f
 
 
-class DenseNet121Extractor(FeatureExtractor):
-    def __init__(self, device: torch.device):
-        super().__init__('densenet121', device)
-        
-        self.model = models.densenet121(weights=models.DenseNet121_Weights.IMAGENET1K_V1)
-        
-        self.features = self.model.features
-        self.model = nn.Sequential(
-            self.features,
+class DenseNetExt(BaseExt):
+    def __init__(self, dev):
+        super().__init__('densenet121', dev)
+
+        self.net = models.densenet121(weights=models.DenseNet121_Weights.IMAGENET1K_V1)
+        self.feats = self.net.features
+        self.net = nn.Sequential(
+            self.feats,
             nn.ReLU(inplace=True),
             nn.AdaptiveAvgPool2d((1, 1)),
             nn.Flatten()
         )
-        self.model.to(device)
-        self.model.eval()
-        
-        self.feature_dim = 1024
-        self.input_size = 224
-        
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        self.net.to(dev)
+        self.net.eval()
+
+        self.dim = 1024
+        self.size = 224
+
+    def forward(self, x):
         with torch.no_grad():
-            features = self.model(x)
-        return features
+            f = self.net(x)
+        return f
 
 
-class DinoV2Extractor(FeatureExtractor):
-    def __init__(self, device: torch.device, model_size: str = 'base'):
-        super().__init__(f'dinov2_{model_size}', device)
-        
-        model_name = f'vit_{model_size}_patch14_dinov2.lvd142m'
-        
+class DinoExt(BaseExt):
+    def __init__(self, dev, size='base'):
+        super().__init__(f'dinov2_{size}', dev)
+
+        m_name = f'vit_{size}_patch14_dinov2.lvd142m'
+
         try:
-            self.model = timm.create_model(model_name, pretrained=True, num_classes=0)
-            self.model.to(device)
-            self.model.eval()
+            self.net = timm.create_model(m_name, pretrained=True, num_classes=0)
+            self.net.to(dev)
+            self.net.eval()
         except Exception as e:
-            raise RuntimeError(f"Failed to load DinoV2: {e}")
-        
-        feature_dims = {
-            'small': 384,
-            'base': 768,
-            'large': 1024,
-            'giant': 1536
-        }
-        
-        self.feature_dim = feature_dims.get(model_size, 768)
-        self.input_size = 518
-        
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+            raise RuntimeError(f"Dino err: {e}")
+
+        dims = {'small': 384, 'base': 768, 'large': 1024, 'giant': 1536}
+        self.dim = dims.get(size, 768)
+        self.size = 518
+
+    def forward(self, x):
         with torch.no_grad():
-            features = self.model(x)
-        return features
+            f = self.net(x)
+        return f
 
 
-def create_feature_extractor(model_name: str, device: torch.device) -> FeatureExtractor:
-    model_name_lower = model_name.lower()
-    
-    if model_name_lower == 'resnet50':
-        extractor = ResNet50Extractor(device)
-    elif model_name_lower == 'densenet121':
-        extractor = DenseNet121Extractor(device)
-    elif model_name_lower.startswith('dinov2'):
-        if '_' in model_name_lower:
-            size = model_name_lower.split('_')[1]
-        else:
-            size = 'base'
-        extractor = DinoV2Extractor(device, model_size=size)
+def get_ext(name, dev):
+    name = name.lower()
+
+    if name == 'resnet50':
+        ext = ResNetExt(dev)
+    elif name == 'densenet121':
+        ext = DenseNetExt(dev)
+    elif name.startswith('dinov2'):
+        size = name.split('_')[1] if '_' in name else 'base'
+        ext = DinoExt(dev, size=size)
     else:
-        raise ValueError(f"Unknown model: {model_name}")
-    
-    print(f"Feature dim: {extractor.get_feature_dim()}, Input size: {extractor.get_input_size()}")
-    
-    return extractor
+        raise ValueError(f"Unknown: {name}")
 
-
-def get_model_info(model_name: str) -> Tuple[int, int]:
-    model_configs = {
-        'resnet50': (2048, 224),
-        'densenet121': (1024, 224),
-        'dinov2': (768, 518),
-        'dinov2_small': (384, 518),
-        'dinov2_base': (768, 518),
-        'dinov2_large': (1024, 518),
-        'dinov2_giant': (1536, 518)
-    }
-    
-    model_name_lower = model_name.lower()
-    if model_name_lower not in model_configs:
-        raise ValueError(f"Unknown model: {model_name}")
-    
-    return model_configs[model_name_lower]
-
+    print(f"Model: {ext.get_dim()} dim, {ext.get_size()} size")
+    return ext

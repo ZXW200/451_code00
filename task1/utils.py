@@ -1,8 +1,6 @@
-# Utility functions for file IO and data handling
 import json
 from datetime import datetime
 from pathlib import Path
-
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
@@ -74,3 +72,4 @@ def get_cols() :
     }
 
     return names, cats
+

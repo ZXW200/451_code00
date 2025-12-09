@@ -1,4 +1,3 @@
-# Main pipeline for image feature extraction and analysis
 import argparse
 import sys
 import traceback
@@ -208,3 +207,4 @@ def main():
 # Entry point
 if __name__ == '__main__':
     main()
+

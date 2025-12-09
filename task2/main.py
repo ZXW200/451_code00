@@ -3,240 +3,181 @@ import sys
 import traceback
 import os
 import shutil
-import urllib.request
 from pathlib import Path
-from tqdm import tqdm
-
+from utils import make_dir, get_dev, calc_bs,print_dev
+from feature_extraction import run_ext
+from dimensionality import run_dim_red
+from cluster import run_clus
+from classification import run_class
 try:
     import kagglehub
 except ImportError:
-    print("Please install kagglehub first: pip install kagglehub")
+    print("pip install kagglehub")
     sys.exit(1)
 
-from utils import create_output_dir, get_device, print_device_info, calculate_batch_size
-from feature_extraction import run_feature_extraction
-from dimensionality import run_dimensionality_reduction
-from cluster import run_clustering_pipeline
-from classification import run_classification_pipeline
 
-# ==========================================
-# Config section - datasets and models
-# ==========================================
 
-TARGET_DATASETS = ['cats_dogs', 'food101']
+DATASETS = ['cats_dogs', 'food101']
 
-DATASET_MODELS_CONFIG = {
+MODELS = {
     'cats_dogs': ['resnet50', 'densenet121', 'dinov2'],
     'food101': ['resnet50', 'densenet121', 'dinov2']
 }
 
-DATASET_INFO = {
+INFO = {
     'cats_dogs': {
         'name': 'Cats vs Dogs',
-        'kaggle_handle': 'karakaggle/kaggle-cat-vs-dog-dataset'
+        'kaggle': 'karakaggle/kaggle-cat-vs-dog-dataset'
     },
     'food101': {
         'name': 'Food-101',
-        'kaggle_handle': 'dansbecker/food-101'
+        'kaggle': 'dansbecker/food-101'
     }
 }
 
 
-# ==========================================
+def link_data(src, name):
+    local_dir = Path(__file__).parent / 'Dataset'
+    local_dir.mkdir(exist_ok=True)
+    dst = local_dir / name
 
-class DownloadProgressBar(tqdm):
-    def update_to(self, b=1, bsize=1, tsize=None):
-        if tsize is not None:
-            self.total = tsize
-        self.update(b * bsize - self.n)
+    if dst.exists():
+        if dst.is_symlink() or dst.is_dir():
+            print(f"Found: {dst}")
+            return str(dst)
 
-
-def link_dataset_to_local(source_path: str, dataset_name: str) -> str:
-    """Create symlink or use cache directly to avoid duplicate data"""
-    local_dataset_dir = Path(__file__).parent / 'Dataset'
-    local_dataset_dir.mkdir(exist_ok=True)
-
-    local_path = local_dataset_dir / dataset_name
-
-    # If already exists and is valid, use it
-    if local_path.exists():
-        if local_path.is_symlink() or local_path.is_dir():
-            print(f"Using existing dataset at: {local_path}")
-            return str(local_path)
-
-    # Try to create symlink first (more efficient)
     try:
-        if local_path.exists():
-            local_path.unlink()
-        local_path.symlink_to(Path(source_path), target_is_directory=True)
-        print(f"Linked dataset to: {local_path}")
-        return str(local_path)
+        if dst.exists(): dst.unlink()
+        dst.symlink_to(Path(src), target_is_directory=True)
+        print(f"Linked: {dst}")
+        return str(dst)
     except (OSError, NotImplementedError):
-        # Symlink not available - use cache directory directly to save space
-        print(f"Symlink not available, using cache directly: {source_path}")
-        print(f"(Skipping copy to save disk space)")
-        return str(source_path)
+        print(f"Link fail, using: {src}")
+        return str(src)
 
 
-def prepare_cats_dogs() -> str:
-    handle = DATASET_INFO['cats_dogs']['kaggle_handle']
-    print(f"\n[Cats vs Dogs] Downloading from kagglehub: {handle} ...")
+def prep_cd():
+    h = INFO['cats_dogs']['kaggle']
+    print(f"\nDL CatsDogs: {h}")
     try:
-        path = kagglehub.dataset_download(handle)
-        print(f"Dataset downloaded to cache: {path}")
+        p = kagglehub.dataset_download(h)
+        print(f"Cached: {p}")
 
-        # Find the correct subfolder with cat/dog directories
-        source_path = None
-        for root, dirs, files in os.walk(path):
-            lower_dirs = [d.lower() for d in dirs]
-            if 'cat' in lower_dirs and 'dog' in lower_dirs:
-                source_path = str(Path(root))
+        src = None
+        for root, dirs, files in os.walk(p):
+            sub = [d.lower() for d in dirs]
+            if 'cat' in sub and 'dog' in sub:
+                src = str(Path(root))
                 break
-
-        if not source_path:
-            source_path = str(path)
-
-        # Link or copy to local Dataset directory
-        return link_dataset_to_local(source_path, 'cats_dogs')
+        if not src: src = str(p)
+        return link_data(src, 'cats_dogs')
 
     except Exception as e:
-        print(f"Failed to download Cats vs Dogs dataset: {e}")
+        print(f"Err: {e}")
         raise e
 
 
-def prepare_food101() -> str:
-    handle = DATASET_INFO['food101']['kaggle_handle']
-    print(f"\n[Food-101] Downloading from kagglehub: {handle} ...")
+def prep_food():
+    h = INFO['food101']['kaggle']
+    print(f"\nDL Food101: {h}")
     try:
-        path = kagglehub.dataset_download(handle)
-        print(f"Dataset downloaded to cache: {path}")
+        p = kagglehub.dataset_download(h)
+        print(f"Cached: {p}")
 
-        # Find the correct subfolder with images
-        source_path = None
-        for root, dirs, files in os.walk(path):
+        src = None
+        for root, dirs, files in os.walk(p):
             if 'images' in dirs:
-                source_path = str(Path(root) / 'images')
+                src = str(Path(root) / 'images')
                 break
-
-        if not source_path:
-            for root, dirs, files in os.walk(path):
+        if not src:
+            for root, dirs, files in os.walk(p):
                 if 'apple_pie' in dirs:
-                    source_path = str(root)
+                    src = str(root)
                     break
-
-        if not source_path:
-            source_path = str(path)
-
-        # Link or copy to local Dataset directory
-        return link_dataset_to_local(source_path, 'food101')
+        if not src: src = str(p)
+        return link_data(src, 'food101')
 
     except Exception as e:
-        print(f"Failed to download Food-101 dataset: {e}")
+        print(f"Err: {e}")
         raise e
 
 
 def main():
-    parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument('--models', type=str, nargs='+', default=None)
-    parser.add_argument('--device', type=str, default=None)
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--models', nargs='+', default=None)
+    parser.add_argument('--device', default=None)
     args = parser.parse_args()
 
     try:
-        output_dir = create_output_dir('pipeline', 'history')
-        device = get_device(args.device)
-        batch_size = calculate_batch_size(device)
+        out = make_dir('pipeline', 'history')
+        dev = get_dev(args.device)
+        bs = calc_bs(dev)
 
-        print(f"Output directory: {output_dir}")
-        print(f"Compute device: {device}")
+        print(f"Out: {out}")
+        print_dev(dev)
 
-        for subdir in ['figures', 'results']:
-            (output_dir / subdir).mkdir(parents=True, exist_ok=True)
+        for d in ['figures', 'results']:
+            (out / d).mkdir(parents=True, exist_ok=True)
 
-        for dataset_name in TARGET_DATASETS:
-            print(f"\n{'=' * 60}")
-            print(f"Processing dataset: {dataset_name}")
-            print(f"{'=' * 60}")
+        for ds in DATASETS:
+            print(f"\nDataset: {ds}")
 
-            if args.models:
-                current_models = args.models
-            else:
-                current_models = DATASET_MODELS_CONFIG.get(dataset_name, [])
+            run_list = args.models if args.models else MODELS.get(ds, [])
+            print(f"Models: {run_list}")
 
-            print(f"Models to run: {current_models}")
-
-            if dataset_name == 'cats_dogs':
-                dataset_path_str = prepare_cats_dogs()
-            elif dataset_name == 'food101':
-                dataset_path_str = prepare_food101()
+            if ds == 'cats_dogs':
+                d_path = prep_cd()
+            elif ds == 'food101':
+                d_path = prep_food()
             else:
                 continue
 
+            for i, m_name in enumerate(run_list, 1):
+                print(f"\n--- {m_name} ({i}/{len(run_list)}) ---")
 
-
-            for model_idx, model_name in enumerate(current_models, 1):
-                print(f"\n--- Model [{model_name}] ({model_idx}/{len(current_models)}) on {dataset_name} ---")
-
-                # Step 1: Feature Extraction
-                features, labels, metadata = run_feature_extraction(
-                    dataset_path=dataset_path_str,
-                    dataset_name=dataset_name,
-                    model_name=model_name,
-                    device=device,
-                    batch_size=batch_size,
-                    output_dir=output_dir
+                # 1. Ext
+                feats, y, meta = run_ext(
+                    d_path, ds, m_name, dev, bs, out
                 )
 
-                class_names = metadata['class_names']
-                task_id = f"{dataset_name}_{model_name}"
-                model_temp_dir = output_dir / '_temp' / task_id
-                (model_temp_dir / 'figures').mkdir(parents=True, exist_ok=True)
-                (model_temp_dir / 'results').mkdir(parents=True, exist_ok=True)
+                names = meta['classes']
+                tid = f"{ds}_{m_name}"
+                tmp = out / '_temp' / tid
+                (tmp / 'figures').mkdir(parents=True, exist_ok=True)
+                (tmp / 'results').mkdir(parents=True, exist_ok=True)
 
-                # Step 2: Dim Reduction & Clustering
-                dim_results = run_dimensionality_reduction(
-                    features, labels, class_names, model_temp_dir
-                )
+                # 2. Dim Red
+                dim_res = run_dim_red(feats, y, names, tmp)
 
-                if dim_results.get('reduced_features') is not None:
-                     clustering_result = run_clustering_pipeline(
-                         dim_results['reduced_features'],
-                         labels,
-                         class_names,
-                         model_temp_dir,
-                         fixed_k=None
+                if 'reduced' in dim_res:
+                    _ = run_clus(
+                        dim_res['reduced'], y, names, tmp, fix_k=None
                     )
 
+                # 3. Classify
+                run_class(feats, y, names, dev, tmp, methods=['linear', 'knn'])
 
-                # Step 3: Classification
-                run_classification_pipeline(
-                    features, labels, class_names, device, model_temp_dir, methods=['linear', 'knn']
-                )
+                # Save
+                res_d = out / 'results' / ds / m_name
+                fig_d = out / 'figures' / ds / m_name
+                res_d.mkdir(parents=True, exist_ok=True)
+                fig_d.mkdir(parents=True, exist_ok=True)
 
-                # Move results to final output location
-                final_res_dir = output_dir / 'results' / dataset_name / model_name
-                final_fig_dir = output_dir / 'figures' / dataset_name / model_name
-                final_res_dir.mkdir(parents=True, exist_ok=True)
-                final_fig_dir.mkdir(parents=True, exist_ok=True)
+                for f in (tmp / 'results').glob('*'):
+                    shutil.copy(f, res_d / f.name)
+                for f in (tmp / 'figures').glob('*'):
+                    shutil.copy(f, fig_d / f.name)
 
-                for f in (model_temp_dir / 'results').glob('*'):
-                    shutil.copy(f, final_res_dir / f.name)
-                for f in (model_temp_dir / 'figures').glob('*'):
-                    shutil.copy(f, final_fig_dir / f.name)
+        if (out / '_temp').exists():
+            shutil.rmtree(out / '_temp')
 
-        if (output_dir / '_temp').exists():
-            shutil.rmtree(output_dir / '_temp')
-
-        print(f"\n{'=' * 80}")
-        print(f"All tasks completed! Results saved to: {output_dir}")
+        print(f"\nDone. Saved to: {out}")
 
     except Exception as e:
-        print(f"\nERROR: {str(e)}")
+        print(f"\nERR: {str(e)}")
         traceback.print_exc()
         sys.exit(1)
 
 
 if __name__ == '__main__':
     main()
-
-
-

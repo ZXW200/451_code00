@@ -1,4 +1,3 @@
-# Main entry point for the climate data clustering pipeline
 import sys
 import traceback
 from utils import make_dir
@@ -6,7 +5,7 @@ from preprocessing import run_prep
 from cluster import run_cluster
 
 
-# Path to the input climate data file
+# Path to climate data file
 DATA_FILE = "ClimateDataBasel.csv"
 
 
@@ -47,3 +46,4 @@ def main():
 # Execute main function when script is run directly
 if __name__ == '__main__':
     main()
+

@@ -1,19 +1,11 @@
-# K-Means clustering for image features
 from pathlib import Path
 import time
 import numpy as np
 from sklearn.cluster import KMeans
-from sklearn.metrics import (
-    silhouette_score,
-    davies_bouldin_score,
-    calinski_harabasz_score,
-    adjusted_rand_score,
-    normalized_mutual_info_score
-)
+from sklearn.metrics import (silhouette_score,davies_bouldin_score,calinski_harabasz_score,
+                             adjusted_rand_score,normalized_mutual_info_score)
 import matplotlib.pyplot as plt
-
 from utils import save_js, fmt_time
-
 
 # Find optimal number of clusters using elbow method
 def find_k(feats, k_range=(2, 10), out_dir=None):
@@ -175,3 +167,4 @@ def run_clus(feats, true, names, out_dir, fix_k=None):
 
     save_js(res, out_dir / 'results', 'clus_res.json')
     return res
+

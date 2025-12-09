@@ -1,5 +1,4 @@
 from pathlib import Path
-from typing import List, Optional, Dict, Any, Tuple
 import time
 import numpy as np
 from sklearn.cluster import KMeans
@@ -12,175 +11,146 @@ from sklearn.metrics import (
 )
 import matplotlib.pyplot as plt
 
-from utils import save_numpy, save_json, format_time
+from utils import save_js, fmt_time
 
 
-def find_optimal_k_kmeans(
-        features: np.ndarray,
-        k_range: Tuple[int, int] = (2, 10),
-        output_dir: Optional[Path] = None
-) -> int:
-    print(f"Finding optimal k in range {k_range}")
+def find_k(feats, k_range=(2, 10), out_dir=None):
+    print(f"Finding k in {k_range}")
 
-    k_values = range(k_range[0], k_range[1] + 1)
-    inertias = []
-    silhouette_scores = []
+    ks = range(k_range[0], k_range[1] + 1)
+    loss = []
+    scores = []
 
-    for k in k_values:
-        kmeans = KMeans(n_clusters=k, random_state=42, n_init=10)
-        labels = kmeans.fit_predict(features)
+    for k in ks:
+        km = KMeans(n_clusters=k, random_state=42, n_init=10)
+        lbls = km.fit_predict(feats)
 
-        inertias.append(kmeans.inertia_)
-        silhouette_scores.append(silhouette_score(features, labels))
+        loss.append(km.inertia_)
+        scores.append(silhouette_score(feats, lbls))
 
         if k % 5 == 0:
-            print(f"k={k}: inertia={kmeans.inertia_:.2f}, silhouette={silhouette_scores[-1]:.4f}")
+            print(f"k={k}: loss={km.inertia_:.2f}, score={scores[-1]:.4f}")
 
-    optimal_k = k_values[np.argmax(silhouette_scores)]
-    print(f"Optimal k: {optimal_k}")
+    best_k = ks[np.argmax(scores)]
+    print(f"Best k: {best_k}")
 
-    if output_dir:
+    if out_dir:
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
 
-        ax1.plot(k_values, inertias, 'bo-')
-        ax1.set_xlabel('Number of Clusters (k)')
+        ax1.plot(ks, loss, 'bo-')
+        ax1.set_xlabel('k')
         ax1.set_ylabel('Inertia')
-        ax1.set_title('Elbow Method')
+        ax1.set_title('Elbow')
         ax1.grid(True, alpha=0.3)
 
-        ax2.plot(k_values, silhouette_scores, 'ro-')
-        ax2.axvline(x=optimal_k, color='g', linestyle='--',
-                    label=f'Optimal k={optimal_k}')
-        ax2.set_xlabel('Number of Clusters (k)')
-        ax2.set_ylabel('Silhouette Score')
-        ax2.set_title('Silhouette Analysis')
+        ax2.plot(ks, scores, 'ro-')
+        ax2.axvline(x=best_k, color='g', linestyle='--', label=f'k={best_k}')
+        ax2.set_xlabel('k')
+        ax2.set_ylabel('Score')
+        ax2.set_title('Silhouette')
         ax2.legend()
         ax2.grid(True, alpha=0.3)
 
         plt.tight_layout()
-        plt.savefig(output_dir / 'figures' / 'kmeans_elbow_curve.png', dpi=300, bbox_inches='tight')
+        plt.savefig(out_dir / 'figures' / 'km_elbow.png', dpi=300, bbox_inches='tight')
         plt.close()
 
-    return optimal_k
+    return best_k
 
 
-def perform_kmeans_clustering(
-        features: np.ndarray,
-        n_clusters: int
-) -> Tuple[np.ndarray, KMeans]:
-    print(f"K-Means clustering (k={n_clusters})")
+def do_kmeans(feats, k):
+    print(f"KMeans (k={k})")
+    t0 = time.time()
 
-    start_time = time.time()
+    km = KMeans(n_clusters=k, random_state=42, n_init=10)
+    lbls = km.fit_predict(feats)
 
-    kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
-    labels = kmeans.fit_predict(features)
+    dt = time.time() - t0
+    print(f"Done: {fmt_time(dt)}")
+    print(f"Sizes: {np.bincount(lbls)}")
 
-    elapsed_time = time.time() - start_time
-    print(f"Completed in {format_time(elapsed_time)}")
-    print(f"Cluster sizes: {np.bincount(labels)}")
-
-    return labels, kmeans
+    return lbls, km
 
 
-def evaluate_clustering(
-        features: np.ndarray,
-        cluster_labels: np.ndarray,
-        labels_true: Optional[np.ndarray] = None
-) -> Dict[str, float]:
-    n_clusters = len(np.unique(cluster_labels))
+def eval_clus(feats, pred, true=None):
+    n_c = len(np.unique(pred))
 
-    # For large datasets, compute metrics on a sample to save time
-    if len(features) > 20000:
-        print("Warning: Dataset too large, computing metrics on sample...")
-        indices = np.random.choice(len(features), 20000, replace=False)
-        features_sample = features[indices]
-        labels_sample = cluster_labels[indices]
-        labels_true_sample = labels_true[indices] if labels_true is not None else None
+    if len(feats) > 20000:
+        print("Sampling for metrics...")
+        idx = np.random.choice(len(feats), 20000, replace=False)
+        fs = feats[idx]
+        ps = pred[idx]
+        ts = true[idx] if true is not None else None
     else:
-        features_sample = features
-        labels_sample = cluster_labels
-        labels_true_sample = labels_true
+        fs, ps, ts = feats, pred, true
 
-    metrics = {
-        'n_clusters': n_clusters,
-        'silhouette_score': silhouette_score(features_sample, labels_sample),
-        'davies_bouldin_score': davies_bouldin_score(features_sample, labels_sample),
-        'calinski_harabasz_score': calinski_harabasz_score(features_sample, labels_sample)
+    m = {
+        'n': n_c,
+        'sil': silhouette_score(fs, ps),
+        'db': davies_bouldin_score(fs, ps),
+        'ch': calinski_harabasz_score(fs, ps)
     }
 
-    if labels_true is not None:
-        metrics.update({
-            'adjusted_rand_score': adjusted_rand_score(labels_true_sample, labels_sample),
-            'normalized_mutual_info': normalized_mutual_info_score(labels_true_sample, labels_sample)
+    if true is not None:
+        m.update({
+            'ari': adjusted_rand_score(ts, ps),
+            'nmi': normalized_mutual_info_score(ts, ps)
         })
 
     print("Metrics:")
-    for metric_name, value in metrics.items():
-        print(f"  {metric_name}: {value:.4f}")
+    for k, v in m.items():
+        print(f"  {k}: {v:.4f}")
 
-    return metrics
+    return m
 
 
-def plot_cluster_distribution(
-        cluster_labels: np.ndarray,
-        method_name: str,
-        output_path: Path
-):
-    unique_labels, counts = np.unique(cluster_labels, return_counts=True)
+def plot_dist(lbls, name, path):
+    unq, cnt = np.unique(lbls, return_counts=True)
 
     plt.figure(figsize=(10, 6))
-    bars = plt.bar(unique_labels, counts, alpha=0.7)
+    bars = plt.bar(unq, cnt, alpha=0.7)
 
-    for bar, count in zip(bars, counts):
+    for bar, c in zip(bars, cnt):
         plt.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 0.5,
-                 f'{count}', ha='center', va='bottom')
+                 f'{c}', ha='center', va='bottom')
 
-    plt.xlabel('Cluster ID')
-    plt.ylabel('Number of Samples')
-    plt.title(f'{method_name} - Cluster Distribution')
+    plt.xlabel('Cluster')
+    plt.ylabel('Count')
+    plt.title(f'{name} Dist')
     plt.grid(True, alpha=0.3, axis='y')
     plt.tight_layout()
 
-    plt.savefig(output_path, dpi=300, bbox_inches='tight')
+    plt.savefig(path, dpi=300, bbox_inches='tight')
     plt.close()
 
 
-def run_clustering_pipeline(
-        features: np.ndarray,
-        labels_true: Optional[np.ndarray],
-        class_names: List[str],
-        output_dir: Path,
-        fixed_k: Optional[int] = None  # if provided, use this k directly without searching
-) -> Dict[str, Any]:
-    results = {}
+def run_clus(feats, true, names, out_dir, fix_k=None):
+    res = {}
 
-    if fixed_k is not None:
-        print(f"1. Using pre-determined optimal k={fixed_k} (Skipping search)")
-        optimal_k = fixed_k
+    if fix_k:
+        print(f"Fixed k={fix_k}")
+        k = fix_k
     else:
-        print("1. Finding optimal k")
-        optimal_k = find_optimal_k_kmeans(
-            features,
-            k_range=(2, min(10, len(class_names) + 3)),
-            output_dir=output_dir
+        k = find_k(
+            feats,
+            k_range=(2, min(10, len(names) + 3)),
+            out_dir=out_dir
         )
 
-    print(f"\n2. K-Means clustering (k={optimal_k})")
-    kmeans_labels, kmeans_model = perform_kmeans_clustering(features, optimal_k)
+    print(f"\nKMeans k={k}")
+    lbls, mod = do_kmeans(feats, k)
 
-    kmeans_metrics = evaluate_clustering(features, kmeans_labels, labels_true)
-    results['kmeans'] = {
-        'labels': kmeans_labels.tolist(),
-        'metrics': kmeans_metrics,
-        'optimal_k': optimal_k
+    met = eval_clus(feats, lbls, true)
+    res['kmeans'] = {
+        'labels': lbls.tolist(),
+        'metrics': met,
+        'k': k
     }
 
-    plot_cluster_distribution(
-        kmeans_labels,
-        'K-Means',
-        output_dir / 'figures' / 'cluster_distribution.png'
+    plot_dist(
+        lbls, 'KMeans',
+        out_dir / 'figures' / 'clus_dist.png'
     )
 
-    save_json(results, output_dir / 'results', 'clustering_metrics.json')
-
-    return results
+    save_js(res, out_dir / 'results', 'clus_res.json')
+    return res

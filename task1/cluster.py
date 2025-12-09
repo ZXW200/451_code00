@@ -1,3 +1,4 @@
+# Import required libraries for clustering and visualization
 from pathlib import Path
 import hdbscan
 import matplotlib
@@ -10,7 +11,9 @@ from sklearn.metrics import calinski_harabasz_score, davies_bouldin_score, silho
 from utils import save_fig
 
 
+# KMeans clustering algorithm wrapper class
 class KM_Algo:
+    # Initialize KMeans algorithm with k range and random seed
     def __init__(self, k_range=(2, 10), seed=42):
         self.k_range = k_range
         self.seed = seed
@@ -19,9 +22,11 @@ class KM_Algo:
         self.loss = {}
         self.scores = {}
 
+    # Find optimal k value using elbow method and silhouette score
     def find_k(self, X, out_path):
         print("Finding k...")
 
+        # Try different k values and calculate metrics
         for k in range(self.k_range[0], self.k_range[1] + 1):
             km = KMeans(n_clusters=k, random_state=self.seed, n_init=10)
             lbls = km.fit_predict(X)
@@ -30,8 +35,10 @@ class KM_Algo:
 
             print(f"k={k}: loss={km.inertia_:.2f}, score={self.scores[k]:.3f}")
 
+        # Create plots for elbow curve and silhouette scores
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
 
+        # Plot elbow curve showing inertia for different k values
         ks = list(self.loss.keys())
         ax1.plot(ks, list(self.loss.values()), 'bo-')
         ax1.set_xlabel('k')
@@ -39,12 +46,14 @@ class KM_Algo:
         ax1.set_title('Elbow')
         ax1.grid(True, alpha=0.3)
 
+        # Plot silhouette scores for different k values
         ax2.plot(ks, list(self.scores.values()), 'ro-')
         ax2.set_xlabel('k')
         ax2.set_ylabel('Score')
         ax2.set_title('Silhouette')
         ax2.grid(True, alpha=0.3)
 
+        # Select best k based on highest silhouette score
         self.best_k = max(self.scores, key=self.scores.get)
         ax2.axvline(x=self.best_k, color='g', linestyle='--',
                     label=f'Best k={self.best_k}')
@@ -57,6 +66,7 @@ class KM_Algo:
 
         return self.best_k
 
+    # Fit KMeans model with specified or optimal k value
     def fit(self, X, k=None):
         if k is None:
             k = self.best_k
@@ -68,9 +78,11 @@ class KM_Algo:
 
         return self
 
+    # Predict cluster labels for input data
     def predict(self, X):
         return self.model.predict(X)
 
+    # Evaluate clustering performance using multiple metrics
     def eval(self, X, y):
         res = {
             'sil': silhouette_score(X, y),
@@ -88,13 +100,16 @@ class KM_Algo:
         return res
 
 
+# HDBSCAN clustering algorithm wrapper class
 class HDB_Algo:
+    # Initialize HDBSCAN algorithm with minimum cluster size and samples
     def __init__(self, min_size=5, min_samp=None, metric='euclidean'):
         self.min_size = min_size
         self.min_samp = min_samp if min_samp else min_size
         self.metric = metric
         self.model = None
 
+    # Fit HDBSCAN model on input data
     def fit(self, X):
         print(f"Fitting HDB (sz={self.min_size}, smp={self.min_samp})...")
 
@@ -107,23 +122,29 @@ class HDB_Algo:
 
         return self
 
+    # Return cluster labels assigned by HDBSCAN
     def predict(self, X):
         return self.model.labels_
 
+    # Evaluate HDBSCAN clustering results with noise handling
     def eval(self, X, y):
+        # Filter out noise points labeled as -1
         mask = y != -1
         X_c = X[mask]
         y_c = y[mask]
 
+        # Count number of clusters and noise points
         n_c = len(set(y)) - (1 if -1 in y else 0)
         n_noise = list(y).count(-1)
 
+        # Store basic clustering statistics
         res = {
             'n_clusters': n_c,
             'n_noise': n_noise,
             'noise_pct': (n_noise / len(y) * 100)
         }
 
+        # Calculate quality metrics only if there are enough clusters
         if n_c >= 2 and len(y_c) > 0:
             res['sil'] = silhouette_score(X_c, y_c)
             res['db'] = davies_bouldin_score(X_c, y_c)
@@ -144,17 +165,21 @@ class HDB_Algo:
         return res
 
 
+# Visualize clusters using PCA and t-SNE dimensionality reduction
 def plot_clusters(X, y, name, out_path):
     print(f"Plotting {name}...")
 
     fig, ax = plt.subplots(1, 2, figsize=(16, 6))
 
+    # Reduce to 2D using PCA
     pca = PCA(n_components=2, random_state=42)
     xp = pca.fit_transform(X)
 
+    # Reduce to 2D using t-SNE
     tsne = TSNE(n_components=2, random_state=42, perplexity=30, max_iter=1000)
     xt = tsne.fit_transform(X)
 
+    # Plot PCA visualization with variance explained
     sc1 = ax[0].scatter(xp[:, 0], xp[:, 1], c=y, cmap='viridis',
                                alpha=0.6, s=30, edgecolors='k', linewidth=0.5)
     ax[0].set_xlabel(f'PC1 ({pca.explained_variance_ratio_[0] * 100:.1f}%)')
@@ -163,6 +188,7 @@ def plot_clusters(X, y, name, out_path):
     ax[0].grid(True, alpha=0.3)
     plt.colorbar(sc1, ax=ax[0])
 
+    # Plot t-SNE visualization
     sc2 = ax[1].scatter(xt[:, 0], xt[:, 1], c=y, cmap='viridis',
                                alpha=0.6, s=30, edgecolors='k', linewidth=0.5)
     ax[1].set_xlabel('t-SNE 1')
@@ -175,14 +201,17 @@ def plot_clusters(X, y, name, out_path):
     save_fig(fig, out_path, f'06_{name.lower()}_viz')
 
 
+# Compare clustering results between different methods
 def compare_res(res, out_path):
     print("Comparing...")
 
+    # Extract metrics from results for each method
     methods = list(res.keys())
     sils = [res[m].get('sil', 0) for m in methods]
     dbs = [res[m].get('db', 0) for m in methods]
     chs = [res[m].get('ch', 0) for m in methods]
 
+    # Create bar charts comparing three metrics
     fig, ax = plt.subplots(1, 3, figsize=(16, 5))
 
     ax[0].bar(methods, sils, color=['#1f77b4', '#ff7f0e'])
@@ -204,13 +233,16 @@ def compare_res(res, out_path):
     save_fig(fig, out_path, '07_compare')
 
 
+# Analyze cluster statistics and characteristics
 def analyze_clusters(df, y, name):
     print(f"Analyzing {name}")
 
     res = {}
     c_ids = sorted(set(y))
 
+    # Process each cluster ID
     for cid in c_ids:
+        # Handle noise points separately
         if cid == -1:
             cnt = sum(y == -1)
             pct = cnt / len(y) * 100
@@ -218,6 +250,7 @@ def analyze_clusters(df, y, name):
             res['noise'] = {'count': cnt, 'pct': pct}
             continue
 
+        # Calculate statistics for each cluster
         mask = y == cid
         sub = df[mask]
 
@@ -235,10 +268,12 @@ def analyze_clusters(df, y, name):
     return res
 
 
+# Main function to run clustering pipeline
 def run_cluster(prep_path, out_path):
     import pandas as pd
     from utils import save_json, save_csv
 
+    # Load preprocessed data
     print("Loading data")
     p_dir = Path(prep_path)
     f_path = p_dir / 'clean_data.csv'
@@ -250,8 +285,10 @@ def run_cluster(prep_path, out_path):
     df = pd.read_csv(f_path)
     print(f"Shape: {df.shape}")
 
+    # Run KMeans clustering
     print("\nK-Means")
 
+    # Find optimal k and fit KMeans model
     km = KM_Algo(k_range=(2, 10), seed=42)
     best_k = km.find_k(df, out_path)
     km.fit(df, k=best_k)
@@ -259,25 +296,31 @@ def run_cluster(prep_path, out_path):
     m_km = km.eval(df, y_km)
     plot_clusters(df, y_km, 'KMeans', out_path)
 
+    # Run HDBSCAN clustering
     print("\nHDBSCAN")
 
+    # Fit HDBSCAN model and evaluate
     hdb = HDB_Algo(min_size=15, min_samp=5)
     hdb.fit(df)
     y_hdb = hdb.predict(df)
     m_hdb = hdb.eval(df, y_hdb)
     plot_clusters(df, y_hdb, 'HDBSCAN', out_path)
 
+    # Analyze and compare clustering results
     print("\nAnalysis")
 
+    # Combine results from both methods
     all_res = {
         'KMeans': m_km,
         'HDBSCAN': m_hdb
     }
 
+    # Generate comparison and analysis reports
     compare_res(all_res, out_path)
     a_km = analyze_clusters(df, y_km, 'KMeans')
     a_hdb = analyze_clusters(df, y_hdb, 'HDBSCAN')
 
+    # Store all results in structured format
     final = {
         'kmeans': {
             'k': best_k,
@@ -292,13 +335,16 @@ def run_cluster(prep_path, out_path):
         }
     }
 
+    # Save clustering results to JSON file
     save_json(final, out_path, 'cluster_res.json')
 
+    # Save data with cluster labels to CSV
     df_out = df.copy()
     df_out['km'] = y_km
     df_out['hdb'] = y_hdb
     save_csv(df_out, out_path, 'clustered_data.csv')
 
+    # Save cluster statistics separately
     c_stats = {
         'km': a_km,
         'hdb': a_hdb

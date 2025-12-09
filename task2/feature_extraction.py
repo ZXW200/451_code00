@@ -1,3 +1,4 @@
+# Feature extraction from images using pretrained deep learning models
 from pathlib import Path
 import time
 import numpy as np
@@ -9,6 +10,7 @@ from preprocessing import make_loader, plot_samples
 from utils import save_js, fmt_time
 
 
+# Extract features from all images in data loader using model
 def get_feats(model, dl, dev):
     print("Extracting...")
 
@@ -18,17 +20,21 @@ def get_feats(model, dl, dev):
 
     t0 = time.time()
 
+    # Process all batches without computing gradients
     with torch.no_grad():
         for i, (imgs, lbls) in enumerate(dl):
             imgs = imgs.to(dev)
             out = model(imgs)
 
+            # Store features and labels
             fs.append(out.cpu().numpy())
             ls.append(lbls.numpy())
 
+            # Print progress every 10 batches
             if (i + 1) % 10 == 0:
                 print(f"Done {(i + 1) * dl.batch_size} imgs")
 
+    # Concatenate all batches
     feats = np.concatenate(fs, axis=0)
     lbls = np.concatenate(ls, axis=0)
 
@@ -39,21 +45,27 @@ def get_feats(model, dl, dev):
     return feats, lbls
 
 
+# Main feature extraction pipeline
 def run_ext(data_path, ds_name, m_name, dev, bs, out_dir):
     print(f"Model: {m_name}")
+    # Load feature extractor model
     ext = get_ext(m_name, dev)
     size = ext.get_size()
 
+    # Create data loader for the dataset
     print("Data loader...")
     dl, info = make_loader(
         data_path, size, bs, shuf=False, aug=False, wk=4
     )
 
+    # Visualize sample images from dataset
     p_viz = out_dir / 'figures' / 'samples.png'
     plot_samples(dl, min(16, len(dl.dataset)), p_viz, info['classes'])
 
+    # Extract features from all images
     feats, lbls = get_feats(ext, dl, dev)
 
+    # Calculate feature statistics
     stats = {
         'mean': np.mean(feats, axis=0).tolist(),
         'std': np.std(feats, axis=0).tolist(),
@@ -61,6 +73,7 @@ def run_ext(data_path, ds_name, m_name, dev, bs, out_dir):
         'max': np.max(feats, axis=0).tolist()
     }
 
+    # Store extraction metadata
     meta = {
         'ds': ds_name,
         'path': str(data_path),

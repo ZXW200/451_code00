@@ -1,3 +1,4 @@
+# Utility functions for file IO and data handling
 import json
 from datetime import datetime
 from pathlib import Path
@@ -8,6 +9,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 
+# Create a timestamped directory for storing pipeline results
 def make_dir(name, base="history"):
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     path = Path(base) / f"run_{name}_{ts}"
@@ -16,6 +18,7 @@ def make_dir(name, base="history"):
     return path
 
 
+# Load CSV data file and print basic information
 def load_data(path):
     print(f"Loading: {path}")
     df = pd.read_csv(path)
@@ -24,6 +27,7 @@ def load_data(path):
     return df
 
 
+# Save matplotlib figure to figures subdirectory
 def save_fig(fig, path, name):
     p = path / "figures" / f"{name}.png"
     fig.savefig(p, dpi=300, bbox_inches='tight')
@@ -31,12 +35,14 @@ def save_fig(fig, path, name):
     print(f"Fig saved: {name}.png")
 
 
+# Save dataframe to CSV file
 def save_csv(df, path, name):
     p = path / name
     df.to_csv(p, index=False)
     print(f"CSV saved: {name}")
 
 
+# Save dictionary or object to JSON file with proper encoding
 def save_json(res, path, name):
     p = path / name
     with open(p, 'w', encoding='utf-8') as f:
@@ -44,7 +50,9 @@ def save_json(res, path, name):
     print(f"JSON saved: {name}")
 
 
+# Get predefined column names and categories for climate data
 def get_cols() :
+    # List of all climate feature names
     names = [
         'temp_min', 'temp_max', 'temp_mean',
         'humidity_min', 'humidity_max', 'humidity_mean',
@@ -54,6 +62,7 @@ def get_cols() :
         'wind_speed_min', 'wind_speed_max', 'wind_speed_mean'
     ]
 
+    # Group features by category
     cats = {
         'temperature': ['temp_min', 'temp_max', 'temp_mean'],
         'humidity': ['humidity_min', 'humidity_max', 'humidity_mean'],

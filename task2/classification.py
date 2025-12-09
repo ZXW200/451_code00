@@ -1,4 +1,3 @@
-# Image classification using neural networks and KNN
 from pathlib import Path
 import time
 import numpy as np
@@ -10,7 +9,6 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, precision_recall_fscore_support, confusion_matrix
 import matplotlib.pyplot as plt
-
 from utils import fmt_time, save_js
 
 
@@ -276,3 +274,4 @@ def run_class(feats, y, names, dev, out, methods=['linear', 'knn']):
 
     save_js(res, out / 'results', 'class_res.json')
     return res
+

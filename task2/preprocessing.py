@@ -1,5 +1,4 @@
 from pathlib import Path
-from typing import Tuple, List, Optional, Dict, Any
 import torch
 from torch.utils.data import Dataset, DataLoader, random_split
 from torchvision import transforms
@@ -7,254 +6,147 @@ from PIL import Image
 import numpy as np
 
 
-class ImageDataset(Dataset):
-    def __init__(
-            self,
-            root_dir: str,
-            transform: Optional[transforms.Compose] = None,
-            extensions: Tuple[str, ...] = ('.jpg', '.jpeg', '.png', '.bmp')
-    ):
-        self.root_dir = Path(root_dir)
-        self.transform = transform
-        self.extensions = extensions
+class ImgDS(Dataset):
+    def __init__(self, root, transform=None, exts=('.jpg', '.jpeg', '.png', '.bmp')):
+        self.root = Path(root)
+        self.tf = transform
+        self.exts = exts
+        self.data = []
+        self.classes = []
+        self.c2i = {}
+        self._load()
 
-        self.samples = []
-        self.class_names = []
-        self.class_to_idx = {}
+    def _load(self):
+        c_dirs = sorted([d for d in self.root.iterdir() if d.is_dir()])
+        if not c_dirs: raise ValueError(f"No dirs in {self.root}")
 
-        self._load_dataset()
+        self.classes = [d.name for d in c_dirs]
+        self.c2i = {n: i for i, n in enumerate(self.classes)}
 
-    def _load_dataset(self):
-        class_dirs = sorted([d for d in self.root_dir.iterdir() if d.is_dir()])
+        for c_dir in c_dirs:
+            idx = self.c2i[c_dir.name]
+            for ext in self.exts:
+                for p in c_dir.glob(f'*{ext}'):
+                    self.data.append((str(p), idx))
 
-        if not class_dirs:
-            # No class folders found - could try recursive search for certain datasets
-            # but for now just raise an error
-            raise ValueError(f"No subdirectories found in {self.root_dir}")
+        if not self.data: raise ValueError(f"No imgs in {self.root}")
 
-        self.class_names = [d.name for d in class_dirs]
-        self.class_to_idx = {name: idx for idx, name in enumerate(self.class_names)}
+    def __len__(self):
+        return len(self.data)
 
-        for class_dir in class_dirs:
-            class_idx = self.class_to_idx[class_dir.name]
-
-            for ext in self.extensions:
-                for img_path in class_dir.glob(f'*{ext}'):
-                    self.samples.append((str(img_path), class_idx))
-
-        if not self.samples:
-            raise ValueError(f"No images found in {self.root_dir}")
-
-    def __len__(self) -> int:
-        return len(self.samples)
-
-    def __getitem__(self, idx: int) -> Tuple[torch.Tensor, int]:
-        img_path, label = self.samples[idx]
+    def __getitem__(self, idx):
+        p, lbl = self.data[idx]
         try:
-            image = Image.open(img_path).convert('RGB')
-            if self.transform:
-                image = self.transform(image)
-            return image, label
+            img = Image.open(p).convert('RGB')
+            if self.tf: img = self.tf(img)
+            return img, lbl
         except Exception as e:
-            print(f"Error loading image {img_path}: {e}")
-            # Return blank image to prevent crashes
-            # assuming transforms end with ToTensor
-            return torch.zeros((3, 224, 224)), label
+            print(f"Err: {p} - {e}")
+            return torch.zeros((3, 224, 224)), lbl
 
-    def get_class_names(self) -> List[str]:
-        return self.class_names
+    def get_classes(self):
+        return self.classes
 
-    def get_num_classes(self) -> int:
-        return len(self.class_names)
+    def get_n_classes(self):
+        return len(self.classes)
 
 
-def get_transforms(input_size: int = 224, augment: bool = False) -> transforms.Compose:
-    normalize = transforms.Normalize(
-        mean=[0.485, 0.456, 0.406],
-        std=[0.229, 0.224, 0.225]
-    )
-
-    if augment:
-        transform = transforms.Compose([
-            transforms.Resize((input_size, input_size)),
+def get_trans(size=224, aug=False):
+    norm = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+    if aug:
+        t = transforms.Compose([
+            transforms.Resize((size, size)),
             transforms.RandomHorizontalFlip(p=0.5),
             transforms.RandomRotation(degrees=15),
             transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1),
-            transforms.ToTensor(),
-            normalize
+            transforms.ToTensor(), norm
         ])
     else:
-        transform = transforms.Compose([
-            transforms.Resize((input_size, input_size)),
-            transforms.ToTensor(),
-            normalize
+        t = transforms.Compose([
+            transforms.Resize((size, size)),
+            transforms.ToTensor(), norm
         ])
+    return t
 
-    return transform
 
+def make_loaders(path, size, bs, tr=0.7, vr=0.15, te=0.15, wk=4):
+    if abs(tr + vr + te - 1.0) > 1e-6: raise ValueError("Split sum != 1")
+    print(f"Load: {path}")
 
-def create_dataloaders(
-        dataset_path: str,
-        input_size: int,
-        batch_size: int,
-        train_ratio: float = 0.7,
-        val_ratio: float = 0.15,
-        test_ratio: float = 0.15,
-        num_workers: int = 4
-) -> Tuple[DataLoader, DataLoader, DataLoader, Dict[str, Any]]:
-    if abs(train_ratio + val_ratio + test_ratio - 1.0) > 1e-6:
-        raise ValueError("train_ratio + val_ratio + test_ratio must equal 1.0")
+    tf = get_trans(size, aug=False)
+    ds = ImgDS(path, transform=tf)
+    print(f"N: {len(ds)}, C: {ds.get_n_classes()}")
 
-    print(f"Loading dataset: {dataset_path}")
+    n_tot = len(ds)
+    n_tr = int(tr * n_tot)
+    n_val = int(vr * n_tot)
+    n_te = n_tot - n_tr - n_val
+    print(f"Split: {n_tr}/{n_val}/{n_te}")
 
-    transform = get_transforms(input_size, augment=False)
-    full_dataset = ImageDataset(dataset_path, transform=transform)
+    ds_tr, ds_val, ds_te = random_split(ds, [n_tr, n_val, n_te], generator=torch.Generator().manual_seed(42))
+    ds_tr.dataset.transform = get_trans(size, aug=True)
 
-    print(f"Samples: {len(full_dataset)}, Classes: {full_dataset.get_num_classes()}")
+    dl_tr = DataLoader(ds_tr, batch_size=bs, shuffle=True, num_workers=wk, pin_memory=True)
+    dl_val = DataLoader(ds_val, batch_size=bs, shuffle=False, num_workers=wk, pin_memory=True)
+    dl_te = DataLoader(ds_te, batch_size=bs, shuffle=False, num_workers=wk, pin_memory=True)
 
-    total_size = len(full_dataset)
-    train_size = int(train_ratio * total_size)
-    val_size = int(val_ratio * total_size)
-    test_size = total_size - train_size - val_size
-
-    print(f"Split - Train: {train_size}, Val: {val_size}, Test: {test_size}")
-
-    train_dataset, val_dataset, test_dataset = random_split(
-        full_dataset,
-        [train_size, val_size, test_size],
-        generator=torch.Generator().manual_seed(42)
-    )
-
-    train_transform = get_transforms(input_size, augment=True)
-    train_dataset.dataset.transform = train_transform
-
-    # pin_memory=False to avoid CUDA issues on Windows
-    train_loader = DataLoader(
-        train_dataset,
-        batch_size=batch_size,
-        shuffle=True,
-        num_workers=num_workers,
-        pin_memory=True
-    )
-
-    val_loader = DataLoader(
-        val_dataset,
-        batch_size=batch_size,
-        shuffle=False,
-        num_workers=num_workers,
-        pin_memory=True
-    )
-
-    test_loader = DataLoader(
-        test_dataset,
-        batch_size=batch_size,
-        shuffle=False,
-        num_workers=num_workers,
-        pin_memory=True
-    )
-
-    # Note: random_split shares the underlying dataset, so transform changes affect all splits
-    # Keeping it simple here but might need CopyDataset wrapper in complex scenarios
-
-    dataset_info = {
-        'num_classes': full_dataset.get_num_classes(),
-        'class_names': full_dataset.get_class_names(),
-        'total_samples': total_size,
-        'train_samples': train_size,
-        'val_samples': val_size,
-        'test_samples': test_size,
-        'input_size': input_size,
-        'batch_size': batch_size
+    info = {
+        'n_cls': ds.get_n_classes(), 'classes': ds.get_classes(),
+        'n_tot': n_tot, 'n_tr': n_tr, 'n_val': n_val, 'n_te': n_te,
+        'size': size, 'bs': bs
     }
+    return dl_tr, dl_val, dl_te, info
 
-    return train_loader, val_loader, test_loader, dataset_info
 
+def make_loader(path, size, bs, shuf=False, aug=False, wk=4):
+    tf = get_trans(size, aug=aug)
+    ds = ImgDS(path, transform=tf)
+    print(f"N: {len(ds)}, C: {ds.get_n_classes()}")
 
-def create_single_dataloader(
-        dataset_path: str,
-        input_size: int,
-        batch_size: int,
-        shuffle: bool = False,
-        augment: bool = False,
-        num_workers: int = 4
-) -> Tuple[DataLoader, Dict[str, Any]]:
-    transform = get_transforms(input_size, augment=augment)
-    dataset = ImageDataset(dataset_path, transform=transform)
-
-    print(f"Samples: {len(dataset)}, Classes: {dataset.get_num_classes()}")
-
-    # pin_memory=False to avoid CUDA issues on Windows
-    dataloader = DataLoader(
-        dataset,
-        batch_size=batch_size,
-        shuffle=shuffle,
-        num_workers=num_workers,
-        pin_memory=False
-    )
-
-    dataset_info = {
-        'num_classes': dataset.get_num_classes(),
-        'class_names': dataset.get_class_names(),
-        'total_samples': len(dataset),
-        'input_size': input_size,
-        'batch_size': batch_size
+    dl = DataLoader(ds, batch_size=bs, shuffle=shuf, num_workers=wk, pin_memory=False)
+    info = {
+        'n_cls': ds.get_n_classes(), 'classes': ds.get_classes(),
+        'n_tot': len(ds), 'size': size, 'bs': bs
     }
+    return dl, info
 
-    return dataloader, dataset_info
 
-
-def visualize_samples(
-        dataloader: DataLoader,
-        num_samples: int,
-        output_path: Path,
-        class_names: List[str]
-):
+def plot_samples(dl, n, out, names):
     import matplotlib.pyplot as plt
-
-    # Grab a batch
     try:
-        images, labels = next(iter(dataloader))
+        imgs, lbls = next(iter(dl))
     except Exception as e:
-        print(f"Warning: Could not fetch samples for visualization: {e}")
+        print(f"Viz err: {e}")
         return
 
-    images = images[:num_samples]
-    labels = labels[:num_samples]
+    imgs = imgs[:n]
+    lbls = lbls[:n]
 
     mean = torch.tensor([0.485, 0.456, 0.406]).view(3, 1, 1)
     std = torch.tensor([0.229, 0.224, 0.225]).view(3, 1, 1)
-    images = images * std + mean
-    images = torch.clamp(images, 0, 1)
+    imgs = imgs * std + mean
+    imgs = torch.clamp(imgs, 0, 1)
 
-    n_cols = min(4, num_samples)
-    n_rows = (num_samples + n_cols - 1) // n_cols
-    if n_rows == 0: n_rows = 1
+    nc = min(4, n)
+    nr = (n + nc - 1) // nc
+    if nr == 0: nr = 1
 
-    fig, axes = plt.subplots(n_rows, n_cols, figsize=(n_cols * 3, n_rows * 3))
+    fig, ax = plt.subplots(nr, nc, figsize=(nc * 3, nr * 3))
+    if n == 1: ax = np.array([ax])
+    ax = ax.flatten()
 
-    # Make sure axes is iterable
-    if num_samples == 1:
-        axes = np.array([axes])
-    axes = axes.flatten()
-
-    for idx, (img, label) in enumerate(zip(images, labels)):
-        if idx >= len(axes):
-            break
-
-        img_np = img.cpu().numpy().transpose(1, 2, 0)
-
-        axes[idx].imshow(img_np)
-        if label < len(class_names):
-            axes[idx].set_title(f'{class_names[label]}')
+    for i, (im, lb) in enumerate(zip(imgs, lbls)):
+        if i >= len(ax): break
+        im_np = im.cpu().numpy().transpose(1, 2, 0)
+        ax[i].imshow(im_np)
+        if lb < len(names):
+            ax[i].set_title(f'{names[lb]}')
         else:
-            axes[idx].set_title(f'Class {label}')
-        axes[idx].axis('off')
+            ax[i].set_title(f'C {lb}')
+        ax[i].axis('off')
 
-    # Hide extra subplots
-    for idx in range(len(images), len(axes)):
-        axes[idx].axis('off')
+    for i in range(len(imgs), len(ax)): ax[i].axis('off')
 
     plt.tight_layout()
-    plt.savefig(output_path, dpi=150, bbox_inches='tight')
+    plt.savefig(out, dpi=150, bbox_inches='tight')
     plt.close()
-

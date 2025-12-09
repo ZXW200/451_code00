@@ -1,4 +1,3 @@
-# Deep learning model extractors for image feature extraction
 import torch
 import torch.nn as nn
 from torchvision import models
@@ -123,3 +122,4 @@ def get_ext(name, dev):
 
     print(f"Model: {ext.get_dim()} dim, {ext.get_size()} size")
     return ext
+

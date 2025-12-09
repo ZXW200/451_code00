@@ -1,4 +1,3 @@
-# Utility functions for deep learning pipeline
 import json
 from pathlib import Path
 from datetime import datetime
@@ -95,3 +94,4 @@ def fmt_time(sec):
         return f"{sec / 60:.2f}m"
     else:
         return f"{sec / 3600:.2f}h"
+

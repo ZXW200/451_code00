@@ -1,10 +1,8 @@
-# Dimensionality reduction using UMAP algorithm
 from pathlib import Path
 import time
 import numpy as np
 import umap
 import matplotlib.pyplot as plt
-
 from utils import save_js, fmt_time
 
 
@@ -96,3 +94,4 @@ def run_dim_red(feats, lbls, names, out_dir):
 
     res['meta'] = meta
     return res
+

@@ -1,49 +1,45 @@
 import json
 from pathlib import Path
 from datetime import datetime
-from typing import Optional, Dict, Any, List, Tuple
 import numpy as np
 import torch
 
 
-def create_output_dir(task_name: str, base_dir: str = 'history') -> Path:
-    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    output_dir = Path(base_dir) / f'instance_{task_name}_{timestamp}'
-    output_dir.mkdir(parents=True, exist_ok=True)
-    
-    (output_dir / 'figures').mkdir(exist_ok=True)
-    (output_dir / 'features').mkdir(exist_ok=True)
-    (output_dir / 'models').mkdir(exist_ok=True)
-    (output_dir / 'results').mkdir(exist_ok=True)
-    
-    return output_dir
+def make_dir(name, base='history'):
+    ts = datetime.now().strftime('%Y%m%d_%H%M%S')
+    path = Path(base) / f'run_{name}_{ts}'
+    path.mkdir(parents=True, exist_ok=True)
+
+    (path / 'figures').mkdir(exist_ok=True)
+    (path / 'features').mkdir(exist_ok=True)
+    (path / 'models').mkdir(exist_ok=True)
+    (path / 'results').mkdir(exist_ok=True)
+
+    return path
 
 
-def get_device(device: Optional[str] = None) -> torch.device:
-    if device is None:
-        device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    
-    device_obj = torch.device(device)
-    
-    return device_obj
+def get_dev(dev=None):
+    if dev is None:
+        dev = 'cuda' if torch.cuda.is_available() else 'cpu'
+    return torch.device(dev)
 
 
-def save_numpy(data: np.ndarray, output_dir: Path, filename: str) -> None:
-    filepath = output_dir / filename
-    np.save(filepath, data)
-    print(f"Saved: {filepath} ({data.shape})")
+def save_npy(data, path, name):
+    p = path / name
+    np.save(p, data)
+    print(f"Saved: {p} ({data.shape})")
 
 
-def load_numpy(filepath: Path) -> np.ndarray:
-    data = np.load(filepath)
-    print(f"Loaded: {filepath} ({data.shape})")
+def load_npy(path):
+    data = np.load(path)
+    print(f"Loaded: {path} ({data.shape})")
     return data
 
 
-def save_json(data: Dict[str, Any], output_dir: Path, filename: str) -> None:
-    filepath = output_dir / filename
-    
-    def convert_types(obj):
+def save_js(data, path, name):
+    p = path / name
+
+    def cvt(obj):
         if isinstance(obj, np.integer):
             return int(obj)
         elif isinstance(obj, np.floating):
@@ -51,83 +47,39 @@ def save_json(data: Dict[str, Any], output_dir: Path, filename: str) -> None:
         elif isinstance(obj, np.ndarray):
             return obj.tolist()
         elif isinstance(obj, dict):
-            return {key: convert_types(value) for key, value in obj.items()}
+            return {k: cvt(v) for k, v in obj.items()}
         elif isinstance(obj, list):
-            return [convert_types(item) for item in obj]
+            return [cvt(i) for i in obj]
         else:
             return obj
-    
-    data = convert_types(data)
-    
-    with open(filepath, 'w') as f:
-        json.dump(data, f, indent=2)
+
+    d = cvt(data)
+    with open(p, 'w') as f:
+        json.dump(d, f, indent=2)
 
 
-def load_json(filepath: Path) -> Dict[str, Any]:
-    with open(filepath, 'r') as f:
-        data = json.load(f)
-    
-    return data
+def load_js(path):
+    with open(path, 'r') as f:
+        return json.load(f)
 
 
-# def get_dataset_info(dataset_name: str) -> Dict[str, Any]:
-#     dataset_configs = {
-#         'cats_dogs': {
-#             'name': 'Cats vs Dogs',
-#             'num_classes': 2,
-#             'class_names': ['cat', 'dog'],
-#             'url': 'https://www.kaggle.com/datasets/karakaggle/kaggle-cat-vs-dog-dataset',
-#             'local_path': 'datasets/cats_dogs'
-#         },
-#         'oxford_pets': {
-#             'name': 'Oxford-IIIT Pet Dataset',
-#             'num_classes': 37,
-#             'class_names': None,
-#             'url': 'https://www.robots.ox.ac.uk/~vgg/data/pets/',
-#             'local_path': 'datasets/oxford_pets'
-#         },
-#         'food101': {
-#             'name': 'Food-101',
-#             'num_classes': 101,
-#             'class_names': None,
-#             'url': 'https://www.kaggle.com/datasets/dansbecker/food-101',
-#             'local_path': 'datasets/food101'
-#         }
-#     }
-    
-#     if dataset_name not in dataset_configs:
-#         raise ValueError(f"Unknown dataset: {dataset_name}")
-    
-#     return dataset_configs[dataset_name]
-
-
-def print_device_info(device: torch.device) -> None:
-    print(f"Device: {device}")
-    
-    if device.type == 'cuda':
+def print_dev(dev):
+    print(f"Device: {dev}")
+    if dev.type == 'cuda':
         print(f"GPU: {torch.cuda.get_device_name(0)}")
 
 
-def calculate_batch_size(device: torch.device, default_cpu: int = 64, default_gpu: int = 256) -> int:
-    if device.type == 'cuda':
-        return default_gpu
+def calc_bs(dev, cpu_bs=64, gpu_bs=256):
+    if dev.type == 'cuda':
+        return gpu_bs
     else:
-        return default_cpu
+        return cpu_bs
 
 
-def format_time(seconds: float) -> str:
-    if seconds < 60:
-        return f"{seconds:.2f}s"
-    elif seconds < 3600:
-        minutes = seconds / 60
-        return f"{minutes:.2f}m"
+def fmt_time(sec):
+    if sec < 60:
+        return f"{sec:.2f}s"
+    elif sec < 3600:
+        return f"{sec / 60:.2f}m"
     else:
-        hours = seconds / 3600
-        return f"{hours:.2f}h"
-
-
-# def create_class_mapping(class_names: List[str]) -> Tuple[Dict[str, int], Dict[int, str]]:
-#     name_to_idx = {name: idx for idx, name in enumerate(sorted(class_names))}
-#     idx_to_name = {idx: name for name, idx in name_to_idx.items()}
-    
-#     return name_to_idx, idx_to_name
+        return f"{sec / 3600:.2f}h"

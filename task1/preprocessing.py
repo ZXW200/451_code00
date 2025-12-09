@@ -1,4 +1,3 @@
-# Data preprocessing module for climate data analysis
 from pathlib import Path
 import matplotlib
 matplotlib.use('Agg')
@@ -298,3 +297,4 @@ def run_prep(path, out_dir) :
     save_json(summ, out_dir, 'summary.json')
 
     print(f"\nDone. Output: {out_dir}")
+

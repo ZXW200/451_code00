@@ -1,39 +1,35 @@
-# main.py
 import sys
 import traceback
-from utils import create_output_dir
-from preprocessing import run_preprocessing_task
-from cluster import run_clustering_task
-import os
+from utils import make_dir
+from preprocessing import run_prep
+from cluster import run_cluster
 
 
-# CSV file path - update this to point to your data file
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DATA_PATH = os.path.join(BASE_DIR, "ClimateDataBasel.csv")
+DATA_FILE = "ClimateDataBasel.csv"
 
 
 def main():
     try:
-        output_dir = create_output_dir('pipeline', 'history')
-        
-        print(f"Data: {DATA_PATH}")
-        print(f"Output: {output_dir}\n")
-        
-        preprocess_dir = output_dir / 'preprocess'
-        cluster_dir = output_dir / 'cluster'
-        
-        for subdir in [preprocess_dir, cluster_dir]:
-            subdir.mkdir(parents=True, exist_ok=True)
-            (subdir / 'figures').mkdir(exist_ok=True)
-        
+        out_dir = make_dir('pipeline', 'history')
+
+        print(f"Data: {DATA_FILE}")
+        print(f"Out: {out_dir}\n")
+
+        p_dir = out_dir / 'prep'
+        c_dir = out_dir / 'cluster'
+
+        for d in [p_dir, c_dir]:
+            d.mkdir(parents=True, exist_ok=True)
+            (d / 'figures').mkdir(exist_ok=True)
+
         print("Preprocessing")
-        run_preprocessing_task(DATA_PATH, preprocess_dir)
-        
+        run_prep(DATA_FILE, p_dir)
+
         print("\nClustering")
-        run_clustering_task(str(preprocess_dir), cluster_dir)
-        
-        print(f"\nResults: {output_dir}")
-        
+        run_cluster(str(p_dir), c_dir)
+
+        print(f"\nResults: {out_dir}")
+
     except Exception as e:
         print(f"Error: {str(e)}")
         traceback.print_exc()
@@ -42,4 +38,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-

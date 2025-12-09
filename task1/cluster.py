@@ -1,4 +1,3 @@
-# Import required libraries for clustering and visualization
 from pathlib import Path
 import hdbscan
 import matplotlib
@@ -352,3 +351,4 @@ def run_cluster(prep_path, out_path):
     save_json(c_stats, out_path, 'cluster_stats.json')
 
     print(f"\nDone. Output: {out_path}")
+

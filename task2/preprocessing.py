@@ -1,4 +1,3 @@
-# Image dataset loading and preprocessing for PyTorch
 from pathlib import Path
 import torch
 from torch.utils.data import Dataset, DataLoader, random_split
@@ -183,3 +182,4 @@ def plot_samples(dl, n, out, names):
     plt.tight_layout()
     plt.savefig(out, dpi=150, bbox_inches='tight')
     plt.close()
+
